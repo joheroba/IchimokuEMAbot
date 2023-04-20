@@ -1,0 +1,51 @@
+//@version=5
+strategy(title="Ichimoku Cloud Strategy EMA Exec", shorttitle="IchiCldStrtHAshJRBx", overlay=true, initial_capital = 1000, default_qty_type = strategy.percent_of_equity, default_qty_value = 100)
+conversionPeriods = input.int(9, minval=1, title="Conversion Line Length")
+basePeriods = input.int(26, minval=1, title="Base Line Length")
+laggingSpan2Periods = input.int(52, minval=1, title="Leading Span B Length")
+displacement = input.int(26, minval=1, title="Lagging Span")
+trail_offset = input.float(defval=0.0, title="Trail Offset")
+trail_percent = input.float(defval=0.0, title="Trail Percent")
+trail_points = input.float(defval=0.0, title="Trail Points")
+
+donchian(len) => math.avg(ta.lowest(len), ta.highest(len))
+conversionLine = donchian(conversionPeriods)
+baseLine = donchian(basePeriods)
+leadLine1 = math.avg(conversionLine, baseLine)
+leadLine2 = donchian(laggingSpan2Periods)
+
+LongCond = close > conversionLine and close > baseLine and close > leadLine1 and close > leadLine2 and close > ta.ema(close, 180)
+ShortCond = close < conversionLine and close < baseLine and close < leadLine1 and close < leadLine2 and close < ta.ema(close, 180)
+
+if LongCond
+    strategy.entry("Long", strategy.long)
+
+    longStopPrice = ta.highest(high, int(trail_percent)) * (1 - trail_offset / 100)
+    longExitPrice = math.max(close, longStopPrice)
+
+    strategy.exit("Long", "Long TP/SL", trail_points = trail_points, trail_offset = trail_offset, stop = longStopPrice, limit = longExitPrice)
+plotshape(LongCond, style=shape.triangleup, color=color.new(color.green,0))
+
+if ShortCond
+    strategy.entry("Short", strategy.short)
+
+    shortStopPrice = ta.lowest(low, int(trail_percent)) * (1 + trail_offset / 100)
+    shortExitPrice = math.min(close, shortStopPrice)
+
+    strategy.exit("Short", "Short TP/SL", trail_points = trail_points, trail_offset = trail_offset, stop = shortStopPrice, limit = shortExitPrice)
+plotshape(ShortCond, style=shape.triangledown, color=color.new(color.red,0))
+
+plot(conversionLine, color=#2962FF, title="Conversion Line")
+plot(baseLine, color=#B71C1C, title="Base Line")
+plot(close, offset = -displacement + 1, color=#43A047, title="Lagging Span")
+p1 = plot(leadLine1, offset = displacement - 1, color=#A5D6A7,
+     title="Leading Span A")
+p2 = plot(leadLine2, offset = displacement - 1, color=#EF9A9A,
+     title="Leading Span B")
+plot(leadLine1 > leadLine2 ? leadLine1 : leadLine2, offset = displacement - 1,
+     title="Kumo Cloud Upper Line", display=display.none) 
+plot(leadLine1 < leadLine2 ? leadLine1 : leadLine2,
+     offset=displacement - 1,
+     title="Kumo Cloud Lower Line",
+     display=display.none) 
+fill(p1, p2, color=leadLine1 > leadLine2 ? color.rgb(67, 160, 71, 90) : color.rgb(244, 67, 54, 90))
